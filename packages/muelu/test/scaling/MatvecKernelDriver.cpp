@@ -37,7 +37,7 @@
 //
 // Questions? Contact
 //                    Jonathan Hu       (jhu@sandia.gov)
-//                    Andrey Prokopenko (aprokop@sandia.gov)
+//                    Andrey whereis linuxProkopenko (aprokop@sandia.gov)
 //                    Ray Tuminaro      (rstumin@sandia.gov)
 //
 // ***********************************************************************
@@ -515,6 +515,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
     bool printTimings = true;   clp.setOption("timings", "notimings",  &printTimings, "print timings to screen");
     int  nrepeat      = 100;    clp.setOption("nrepeat",               &nrepeat,      "repeat the experiment N times");
+    int vsize         = 25000;   clp.setOption("vsize",                 &vsize,        "Set STREAM vector size");
 
     bool describeMatrix = true; clp.setOption("showmatrix", "noshowmatrix",  &describeMatrix, "describe matrix");
     bool useStackedTimer = false; clp.setOption("stackedtimer", "nostackedtimer",  &useStackedTimer, "use stacked timer");
@@ -832,7 +833,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
         #ifdef HAVE_MUELU_MAGMASPARSE
         // Magma CSR
         case Experiments::MAGMASPARSE:
-        {
+        {Automatic_Test_ETI
            const Scalar alpha = 1.0;
            const Scalar beta = 0.0;
            TimeMonitor t(*TimeMonitor::getNewTimer("MV MagmaSparse: Total"));
@@ -900,18 +901,21 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
     mkl_sparse_destroy(mkl_A);
 #endif
       double vectordoubleadd_avg_time, vectordoubleadd_avg_distributed, densematrixmult_avg, densematrixmult_distributed;
-      int kernel_repetitions = 10000; int vector_size = 25000;
+      int kernel_repetitions = nrepeat * 100; int vector_size = vsize;
       int rank = comm->getRank(); int nproc = comm->getSize();
 
-      // STREAM Vector Addition
+
+// =========================================================================
+// STREAM Tests
+// =========================================================================
+
       std::vector<double> vda_times = singleNodeVectorAdditionTest(kernel_repetitions, vector_size);
       vectordoubleadd_avg_time = accumulate(vda_times.begin(), vda_times.end(), 0.0) / vda_times.size();
-
+      vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
       std::vector<double> dmm_times = singleNodeDenseMatrixMultiplicationTest(kernel_repetitions,40,40,50);
       densematrixmult_avg = accumulate(dmm_times.begin(), dmm_times.end(), 0.0) / dmm_times.size();
 
       if(nproc > 1) {
-
 
         Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &vectordoubleadd_avg_time, &vectordoubleadd_avg_distributed);
         Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &densematrixmult_avg, &densematrixmult_distributed);
@@ -920,17 +924,6 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
         std::map<int, double> pingpong = pingpong_test(kernel_repetitions, comm);
 
         if(rank == 0) {
-          // VDA
-          std::cout << "\n========================================================\nVector Addition with Doubles Benchmark: ran "
-                    << kernel_repetitions << " times.\nVector size = " << vector_size
-                    << "\tTotal Elapsed Time: " << accumulate(vda_times.begin(), vda_times.end(), 0.0)
-                    << " seconds \tAverage Elapsed Time per test: " << vectordoubleadd_avg_distributed*10e6 << " us." << std::endl;
-        //  std::cout << "Rank 0 average: " << vectordoubleadd_avg_time << " Everyone's average: " << vectordoubleadd_avg_distributed << std::endl;
-
-        std::cout << "\n========================================================\nDense Matrix Multiplication Benchmark: ran "
-                  << kernel_repetitions << " times.\nTotal Elapsed Time: " << accumulate(dmm_times.begin(), dmm_times.end(), 0.0)
-                  << " seconds \tAverage Elapsed Time per test: " << densematrixmult_distributed*10e6 << " us." << std::endl;
-
           // pingpong
           std::cout << "\nPing-Pong Benchmark: ran " << kernel_repetitions << " times.\n" <<
           "========================================================\nMessage Size\t | Average Time (us)" << std::endl;
@@ -942,6 +935,23 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
                     << std::endl;
         }
       }
+
+      if(rank == 0) {
+        // VDA
+        std::cout << "\n========================================================\nVector Addition with Doubles Benchmark: ran "
+                    << kernel_repetitions * nproc << " times on " << nproc << " processes. \nVector size = " << vector_size
+                    << "\tTotal Elapsed Time: " << accumulate(vda_times.begin(), vda_times.end(), 0.0)
+                    << " seconds \tAverage Elapsed Time per test: " << vectordoubleadd_avg_distributed*1e6 << " us." << std::endl;
+
+        std::cout << "\n========================================================\nDense Matrix Multiplication Benchmark: ran "
+                  << kernel_repetitions * nproc << " times on " << nproc << " processes. \nTotal Elapsed Time: " << accumulate(dmm_times.begin(), dmm_times.end(), 0.0)
+                  << " seconds \tAverage Elapsed Time per test: " << densematrixmult_distributed*1e6 << " us." << std::endl;
+      }
+
+
+
+
+
 
     success = true;
   }

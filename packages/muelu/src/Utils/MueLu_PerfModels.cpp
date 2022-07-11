@@ -67,7 +67,7 @@ namespace MueLu {
       std::vector<double> a(VECTOR_SIZE),
                           b(VECTOR_SIZE),
                           c(VECTOR_SIZE),
-                          test_times(VECTOR_SIZE);
+                          test_times(KERNEL_REPEATS);
 
       for(i = 0; i < VECTOR_SIZE; i++) {
         a.push_back(1.0/(i+1));
@@ -84,7 +84,7 @@ namespace MueLu {
 
         clock_t end = clock();
         double diffs = (end - start)/(double)CLOCKS_PER_SEC;
-        test_times.push_back(diffs);
+        test_times[i] = diffs;
       }
 
       double avg = accumulate(test_times.begin(), test_times.end(), 0.0) / test_times.size();
@@ -172,8 +172,8 @@ namespace MueLu {
         msg_arr[i+1] = (int) pow(2,i);
       }
 
-      if (nproc != 2) {
-        if (rank == 0) printf("This benchmark should be run on exactly two processes");
+      if (nproc < 2) {
+        if (rank == 0) printf("This benchmark should be run on at least two processes");
         exit(EXIT_FAILURE);
       }
 
