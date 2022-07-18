@@ -796,7 +796,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
     bool printTimings = true;   clp.setOption("timings", "notimings",  &printTimings, "print timings to screen");
     int  nrepeat      = 100;    clp.setOption("nrepeat",               &nrepeat,      "repeat the experiment N times");
-    int  vsize        = 10000;  clp.setOption("vsize",                 &vsize,        "Adjust STREAM vector size")
+    int  vsize        = 10000;  clp.setOption("vsize",                 &vsize,        "Adjust STREAM vector size");
 
     bool describeMatrix = true; clp.setOption("showmatrix", "noshowmatrix",  &describeMatrix, "describe matrix");
     bool useStackedTimer = false; clp.setOption("stackedtimer", "nostackedtimer",  &useStackedTimer, "use stacked timer");
