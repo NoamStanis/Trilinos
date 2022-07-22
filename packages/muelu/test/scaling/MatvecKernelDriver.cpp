@@ -47,6 +47,8 @@
 #include <algorithm>  // shuffle
 #include <vector>     // vector
 #include <random>
+#include <type_traits>
+#include <string>
 
 #include <Xpetra_MultiVectorFactory.hpp>
 #include <Xpetra_IO.hpp>
@@ -300,7 +302,7 @@ public:
                    const vector_type& X,
                    vector_type& Y) {
     using LO = LocalOrdinal;
-    using GO = GlobalOrdinal;
+    using GO = int;
 
     // Time to copy the matrix / vector over to HYPRE datastructures
     const MPI_Comm & comm = *Teuchos::rcp_dynamic_cast<const Teuchos::MpiComm<int> >(A.getRowMap()->getComm())->getRawMpiComm();
@@ -311,13 +313,13 @@ public:
     MakeContiguousMaps(A,c_row_map,c_col_map,c_domain_map);
 
     // Create matrix
-    int row_lo = c_row_map->getMinGlobalIndex();
-    int row_hi = c_row_map->getMaxGlobalIndex();
-    int dom_lo = c_domain_map->getMinGlobalIndex();
-    int dom_hi = c_domain_map->getMaxGlobalIndex();
-    HYPRE_CHK_ERR(HYPRE_IJMatrixCreate(comm,row_lo,row_hi,dom_lo,dom_hi, &ij_matrix));
-    HYPRE_CHK_ERR(HYPRE_IJMatrixSetObjectType(ij_matrix,HYPRE_PARCSR));
-    HYPRE_CHK_ERR(HYPRE_IJMatrixInitialize(ij_matrix));
+        int row_lo = c_row_map->getMinGlobalIndex();
+        int row_hi = c_row_map->getMaxGlobalIndex();
+        int dom_lo = c_domain_map->getMinGlobalIndex();
+        int dom_hi = c_domain_map->getMaxGlobalIndex();
+        HYPRE_CHK_ERR(HYPRE_IJMatrixCreate(comm,row_lo,row_hi,dom_lo,dom_hi, &ij_matrix));
+        HYPRE_CHK_ERR(HYPRE_IJMatrixSetObjectType(ij_matrix,HYPRE_PARCSR));
+        HYPRE_CHK_ERR(HYPRE_IJMatrixInitialize(ij_matrix));
 
 
     // Fill matrix
@@ -796,7 +798,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
     bool printTimings = true;   clp.setOption("timings", "notimings",  &printTimings, "print timings to screen");
     int  nrepeat      = 100;    clp.setOption("nrepeat",               &nrepeat,      "repeat the experiment N times");
-    int  vsize        = 10000;  clp.setOption("vsize",                 &vsize,        "Adjust STREAM vector size");
+    int  vsize        = 100;    clp.setOption("vsize",               &vsize,      "set STREAM vector suze");
 
     bool describeMatrix = true; clp.setOption("showmatrix", "noshowmatrix",  &describeMatrix, "describe matrix");
     bool useStackedTimer = false; clp.setOption("stackedtimer", "nostackedtimer",  &useStackedTimer, "use stacked timer");
@@ -1261,48 +1263,71 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 // STREAM Tests
 // =========================================================================
 
-      double vectordoubleadd_avg_time, vectordoubleadd_avg_distributed, densematrixmult_avg, densematrixmult_distributed;
-      int vector_size = vsize;
+      double vectordoubleadd_totalavg, vectordoubleadd_avg_time, vectordoubleadd_avg_distributed; // densematrixmult_avg, densematrixmult_distributed;;
       int rank = comm->getRank(); int nproc = comm->getSize();
+      int nnz = static_cast<int>(Att.getLocalMatrixHost().graph.entries.extent(0));
+      std::string SPMV_test_names[4] = {"colind","rowptr","vals","x"};
+      std::map<int,int> SPMV_test_values;
 
-      std::vector<double> vda_times = singleNodeVectorAdditionTest(nrepeat, vector_size);
-      vectordoubleadd_avg_time = accumulate(vda_times.begin(), vda_times.end(), 0.0) / vda_times.size();
-      vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
-      std::vector<double> dmm_times = singleNodeDenseMatrixMultiplicationTest(nrepeat,40,40,50);
-      densematrixmult_avg = accumulate(dmm_times.begin(), dmm_times.end(), 0.0) / dmm_times.size();
+      SPMV_test_values[0] = nnz; // colind
+      SPMV_test_values[1] = vsize + 1; // rowptr
+      SPMV_test_values[2] = nnz; // vals
+      SPMV_test_values[3] = vsize; // x
 
-      if(nproc > 1) {
+      for(int i = 0; i < 4; i++) {
 
-        Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &vectordoubleadd_avg_time, &vectordoubleadd_avg_distributed);
-        Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &densematrixmult_avg, &densematrixmult_distributed);
-        vectordoubleadd_avg_distributed /= nproc; // move this outside
-        densematrixmult_distributed /= nproc;
-        std::map<int, double> pingpong = pingpong_test(nrepeat, comm);
+        if(i < 2) {
+          std::vector<double> vda_times = singleNodeVectorAdditionTest<int>(nrepeat,SPMV_test_values[i]);
+          vectordoubleadd_totalavg = accumulate(vda_times.begin(), vda_times.end(), 0.0);
+          vectordoubleadd_avg_time = vectordoubleadd_totalavg / vda_times.size();
+          vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
+        }
+        else {
+          std::vector<double> vda_times = singleNodeVectorAdditionTest<double>(nrepeat,SPMV_test_values[i]);
+          vectordoubleadd_totalavg = accumulate(vda_times.begin(), vda_times.end(), 0.0);
+          vectordoubleadd_avg_time = vectordoubleadd_totalavg / vda_times.size();
+          vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
+        }
+
+
+        // std::vector<double> dmm_times = singleNodeDenseMatrixMultiplicationTest(nrepeat,40,40,50);
+        // densematrixmult_avg = accumulate(dmm_times.begin(), dmm_times.end(), 0.0) / dmm_times.size();
+
+        if(nproc > 1) {
+
+          Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &vectordoubleadd_avg_time, &vectordoubleadd_avg_distributed);
+          vectordoubleadd_avg_distributed /= nproc;
+          // Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &densematrixmult_avg, &densematrixmult_distributed);
+          // densematrixmult_distributed /= nproc;
+          std::map<int, double> pingpong = pingpong_test(nrepeat, comm);
+
+          if(rank == 0) {
+            // pingpong
+            std::cout << "\nPing-Pong Benchmark: ran " << nrepeat << " times.\n" <<
+            "========================================================\nMessage Size\t | Average Time (us)" << std::endl;
+
+            for(auto it = pingpong.cbegin(); it != pingpong.cend(); ++it) {
+              std::cout << it->first << " bytes \t | " << it->second << " us" << std::endl;
+            }
+            std::cout << "========================================================"
+                      << std::endl;
+          }
+        }
 
         if(rank == 0) {
-          // pingpong
-          std::cout << "\nPing-Pong Benchmark: ran " << nrepeat << " times.\n" <<
-          "========================================================\nMessage Size\t | Average Time (us)" << std::endl;
+          // VDA
+          std::cout << "\n========================================================\nVector Addition with Doubles Benchmark: ran "
+                      << nrepeat << " times on " << nproc << " processes.\nRan with SPMV value of variable "
+                      << SPMV_test_names[i] <<  ".\nVector size = " << SPMV_test_values[i]
+                      << "\tTotal Elapsed Time: " << vectordoubleadd_totalavg
+                      << " seconds \tAverage Elapsed Time per test: " << vectordoubleadd_avg_distributed*1e6 << " us." << std::endl;
 
-          for(auto it = pingpong.cbegin(); it != pingpong.cend(); ++it) {
-            std::cout << it->first << " bytes \t | " << it->second << " us" << std::endl;
-          }
-          std::cout << "========================================================"
-                    << std::endl;
+          // std::cout << "\n========================================================\nDense Matrix Multiplication Benchmark: ran "
+          //           << nrepeat << " times on " << nproc << " processes. \nTotal Elapsed Time: " << accumulate(dmm_times.begin(), dmm_times.end(), 0.0)
+          //           << " seconds \tAverage Elapsed Time per test: " << densematrixmult_distributed*1e6 << " us." << std::endl;
         }
       }
 
-      if(rank == 0) {
-        // VDA
-        std::cout << "\n========================================================\nVector Addition with Doubles Benchmark: ran "
-                    << nrepeat << " times on " << nproc << " processes. \nVector size = " << vector_size
-                    << "\tTotal Elapsed Time: " << accumulate(vda_times.begin(), vda_times.end(), 0.0)
-                    << " seconds \tAverage Elapsed Time per test: " << vectordoubleadd_avg_distributed*1e6 << " us." << std::endl;
-
-        std::cout << "\n========================================================\nDense Matrix Multiplication Benchmark: ran "
-                  << nrepeat << " times on " << nproc << " processes. \nTotal Elapsed Time: " << accumulate(dmm_times.begin(), dmm_times.end(), 0.0)
-                  << " seconds \tAverage Elapsed Time per test: " << densematrixmult_distributed*1e6 << " us." << std::endl;
-      }
 
     success = true;
   }

@@ -70,7 +70,36 @@ namespace MueLu {
      *    - https://www.cs.virginia.edu/stream/ref.html
      *    - https://github.com/UoB-HPC/BabelStream
      */
-    std::vector<double> singleNodeVectorAdditionTest(int& KERNEL_REPEATS, int& VECTOR_SIZE);
+    template<class T>
+    std::vector<double> singleNodeVectorAdditionTest(int& KERNEL_REPEATS, int& VECTOR_SIZE) {
+      int i,j;
+      std::vector<T> a(VECTOR_SIZE),b(VECTOR_SIZE), c(VECTOR_SIZE);
+      std::vector<double> test_times(KERNEL_REPEATS);
+
+      for(i = 0; i < VECTOR_SIZE; i++) {
+        a.push_back(1.0/(i+1));
+        b.push_back(a[i]);
+      }
+
+
+      for(i = 0; i < KERNEL_REPEATS; i++) {
+        clock_t start = clock();
+
+        for(j = 0; j < VECTOR_SIZE; ++j) { //Vector Addition
+            c[j] = a[j] + b[j];
+        }
+
+        clock_t end = clock();
+        double diffs = (end - start)/(double)CLOCKS_PER_SEC;
+        test_times[i] = diffs;
+      }
+
+      double avg = accumulate(test_times.begin(), test_times.end(), 0.0) / test_times.size();
+
+      return test_times;
+    }
+
+
     std::vector<double> singleNodeDenseMatrixMultiplicationTest(int& KERNEL_REPEATS, int row1, int col1, int col2);
 
 
