@@ -1265,17 +1265,34 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
       double vectordoubleadd_totalavg, vectordoubleadd_avg_time, vectordoubleadd_avg_distributed; // densematrixmult_avg, densematrixmult_distributed;;
       int rank = comm->getRank(); int nproc = comm->getSize();
+      int m   = static_cast<int>(Att.getLocalNumRows());
       int nnz = static_cast<int>(Att.getLocalMatrixHost().graph.entries.extent(0));
       std::string SPMV_test_names[4] = {"colind","rowptr","vals","x"};
       std::map<int,int> SPMV_test_values;
 
       SPMV_test_values[0] = nnz; // colind
-      SPMV_test_values[1] = vsize + 1; // rowptr
+      SPMV_test_values[1] = m + 1; // rowptr
       SPMV_test_values[2] = nnz; // vals
-      SPMV_test_values[3] = vsize; // x
+      SPMV_test_values[3] = m; // x
+
+      //Ping Pong
+      if(nproc > 1) {
+        std::map<int, double> pingpong = pingpong_test(nrepeat, comm);
+
+        if(rank == 0) {
+          // pingpong
+          std::cout << "\nPing-Pong Benchmark: ran " << nrepeat << " times.\n" <<
+          "========================================================\nMessage Size\t | Average Time (us)" << std::endl;
+
+          for(auto it = pingpong.cbegin(); it != pingpong.cend(); ++it) {
+            std::cout << it->first << " bytes \t | " << it->second << " us" << std::endl;
+          }
+          std::cout << "========================================================"
+                    << std::endl;
+        }
+      }
 
       for(int i = 0; i < 4; i++) {
-
         if(i < 2) {
           std::vector<double> vda_times = singleNodeVectorAdditionTest<int>(nrepeat,SPMV_test_values[i]);
           vectordoubleadd_totalavg = accumulate(vda_times.begin(), vda_times.end(), 0.0);
@@ -1294,24 +1311,10 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
         // densematrixmult_avg = accumulate(dmm_times.begin(), dmm_times.end(), 0.0) / dmm_times.size();
 
         if(nproc > 1) {
-
           Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &vectordoubleadd_avg_time, &vectordoubleadd_avg_distributed);
           vectordoubleadd_avg_distributed /= nproc;
           // Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &densematrixmult_avg, &densematrixmult_distributed);
           // densematrixmult_distributed /= nproc;
-          std::map<int, double> pingpong = pingpong_test(nrepeat, comm);
-
-          if(rank == 0) {
-            // pingpong
-            std::cout << "\nPing-Pong Benchmark: ran " << nrepeat << " times.\n" <<
-            "========================================================\nMessage Size\t | Average Time (us)" << std::endl;
-
-            for(auto it = pingpong.cbegin(); it != pingpong.cend(); ++it) {
-              std::cout << it->first << " bytes \t | " << it->second << " us" << std::endl;
-            }
-            std::cout << "========================================================"
-                      << std::endl;
-          }
         }
 
         if(rank == 0) {
