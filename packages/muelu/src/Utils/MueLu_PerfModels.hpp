@@ -110,7 +110,7 @@ namespace MueLu {
      *
      * See further: https://mvapich.cse.ohio-state.edu/benchmarks/
      */
-    std::map<int,double> pingpong_test(int& KERNEL_REPEATS, RCP<const Teuchos::Comm<int>> comm);
+    std::map<int,double> pingpong_test(int& KERNEL_REPEATS, int& MAX_SIZE, RCP<const Teuchos::Comm<int>> comm);
 
   } //namespace PerfUtils
 

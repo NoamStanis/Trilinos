@@ -798,7 +798,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
     bool printTimings = true;   clp.setOption("timings", "notimings",  &printTimings, "print timings to screen");
     int  nrepeat      = 100;    clp.setOption("nrepeat",               &nrepeat,      "repeat the experiment N times");
-    int  vsize        = 100;    clp.setOption("vsize",               &vsize,      "set STREAM vector suze");
+    int  psize        = 32768;    clp.setOption("psize",               &psize,      "set max ping pong size");
 
     bool describeMatrix = true; clp.setOption("showmatrix", "noshowmatrix",  &describeMatrix, "describe matrix");
     bool useStackedTimer = false; clp.setOption("stackedtimer", "nostackedtimer",  &useStackedTimer, "use stacked timer");
@@ -1277,7 +1277,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
       //Ping Pong
       if(nproc > 1) {
-        std::map<int, double> pingpong = pingpong_test(nrepeat, comm);
+        std::map<int, double> pingpong = pingpong_test(nrepeat,psize, comm);
 
         if(rank == 0) {
           // pingpong

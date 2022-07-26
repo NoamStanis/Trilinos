@@ -94,7 +94,7 @@ namespace MueLu {
         }
 
       // TIMED BENCHMARK BEGINS
-      for(int t = 0; t < times.size(); t++) {
+      for(size_t t = 0; t < times.size(); t++) {
         clock_t start = clock();
 
         for(i = 0; i < row1; ++i) {
@@ -118,11 +118,10 @@ namespace MueLu {
     }
 
 
-    std::map<int,double> pingpong_test(int& KERNEL_REPEATS, RCP<const Teuchos::Comm<int>> comm) {
+    std::map<int,double> pingpong_test(int& KERNEL_REPEATS, int& MAX_SIZE, RCP<const Teuchos::Comm<int>> comm) {
       using Teuchos::BaseTimer;
       int rank, nproc, msg_length, i, j;
-      int msg_arr[17]; // values from 0,1,2... to 2^15. Sizes of each buffer send
-      int MAX_SIZE = 32769;
+      std::vector<int> msg_arr((int)pow(2,MAX_SIZE)); // values from 0,1,2... to 2^15. Sizes of each buffer send
       char  *s_buf, *r_buf;  // Send & recieve buffers
       double t_avg;
       std::vector<double> time_array(KERNEL_REPEATS); //Stores the times for every single kernel repetition. Reset with each repeat.
@@ -137,7 +136,7 @@ namespace MueLu {
       nproc = comm->getSize();
 
       msg_arr[0] = 0;
-      for(i = 0; i < 16; i++) {
+      for(i = 0; i < MAX_SIZE; i++) {
         msg_arr[i+1] = (int) pow(2,i);
       }
 
@@ -147,15 +146,15 @@ namespace MueLu {
       }
 
       //Allocating memory for the buffers.
-      MPI_Alloc_mem(MAX_SIZE, MPI_INFO_NULL, &r_buf);
-      MPI_Alloc_mem(MAX_SIZE, MPI_INFO_NULL, &s_buf);
+      MPI_Alloc_mem( (int) pow(2,MAX_SIZE), MPI_INFO_NULL, &r_buf);
+      MPI_Alloc_mem( (int) pow(2,MAX_SIZE), MPI_INFO_NULL, &s_buf);
 
       // Populate send buffer
-      for(i = 0; i < MAX_SIZE; i++)
+      for(i = 0; i < (int) pow(2,MAX_SIZE); i++)
         s_buf[i] = 1;
 
       //Send and recieve.
-      for(msg_length = 0; msg_length < 17; msg_length++) {
+      for(msg_length = 0; msg_length < MAX_SIZE + 1 ; msg_length++) {
         comm->barrier();
 
         for(j = 0; j < KERNEL_REPEATS; j++) {
