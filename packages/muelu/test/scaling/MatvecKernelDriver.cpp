@@ -75,6 +75,7 @@
 #include "KokkosSparse_spmv.hpp"
 #endif
 #include "Kokkos_Core.hpp"
+#include "Kokkos_Vector.hpp"
 
 #if defined(HAVE_MUELU_CUSPARSE)
 #include "cublas_v2.h"
@@ -798,7 +799,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
     bool printTimings = true;   clp.setOption("timings", "notimings",  &printTimings, "print timings to screen");
     int  nrepeat      = 100;    clp.setOption("nrepeat",               &nrepeat,      "repeat the experiment N times");
-    int  psize        = 32768;    clp.setOption("psize",               &psize,      "set max ping pong size");
+    int  psize        = 14;    clp.setOption("psize",               &psize,      "set max ping pong size");
 
     bool describeMatrix = true; clp.setOption("showmatrix", "noshowmatrix",  &describeMatrix, "describe matrix");
     bool useStackedTimer = false; clp.setOption("stackedtimer", "nostackedtimer",  &useStackedTimer, "use stacked timer");
@@ -1294,14 +1295,14 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib& lib, int ar
 
       for(int i = 0; i < 4; i++) {
         if(i < 2) {
-          std::vector<double> vda_times = singleNodeVectorAdditionTest<int>(nrepeat,SPMV_test_values[i]);
-          vectordoubleadd_totalavg = accumulate(vda_times.begin(), vda_times.end(), 0.0);
+          Kokkos::vector<double> vda_times = singleNodeVectorAdditionTest<int>(nrepeat,SPMV_test_values[i]);
+          vectordoubleadd_totalavg = std::accumulate(vda_times.begin(), vda_times.end(), 0.0);
           vectordoubleadd_avg_time = vectordoubleadd_totalavg / vda_times.size();
           vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
         }
         else {
-          std::vector<double> vda_times = singleNodeVectorAdditionTest<double>(nrepeat,SPMV_test_values[i]);
-          vectordoubleadd_totalavg = accumulate(vda_times.begin(), vda_times.end(), 0.0);
+          Kokkos::vector<double> vda_times = singleNodeVectorAdditionTest<double>(nrepeat,SPMV_test_values[i]);
+          vectordoubleadd_totalavg = std::accumulate(vda_times.begin(), vda_times.end(), 0.0);
           vectordoubleadd_avg_time = vectordoubleadd_totalavg / vda_times.size();
           vectordoubleadd_avg_distributed = vectordoubleadd_avg_time;
         }

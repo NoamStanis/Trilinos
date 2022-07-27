@@ -48,6 +48,8 @@
 
 #include <iostream>
 #include <vector>
+#include <Kokkos_Core.hpp>
+#include <Kokkos_Vector.hpp>
 #include <Teuchos_StandardCatchMacros.hpp>
 #include <Teuchos_StackedTimer.hpp>
 
@@ -71,30 +73,33 @@ namespace MueLu {
      *    - https://github.com/UoB-HPC/BabelStream
      */
     template<class T>
-    std::vector<double> singleNodeVectorAdditionTest(int& KERNEL_REPEATS, int& VECTOR_SIZE) {
-      int i,j;
-      std::vector<T> a(VECTOR_SIZE),b(VECTOR_SIZE), c(VECTOR_SIZE);
-      std::vector<double> test_times(KERNEL_REPEATS);
+    Kokkos::vector<double> singleNodeVectorAdditionTest(int& KERNEL_REPEATS, int& VECTOR_SIZE) {
+      Kokkos::View<T*> a("a", VECTOR_SIZE);
+      Kokkos::View<T*> b("b", VECTOR_SIZE);
+      Kokkos::View<T*> c("c", VECTOR_SIZE);
+      Kokkos::vector<double> test_times(KERNEL_REPEATS);
 
-      for(i = 0; i < VECTOR_SIZE; i++) {
-        a.push_back(1.0/(i+1));
-        b.push_back(a[i]);
-      }
+      // for(i = 0; i < VECTOR_SIZE; i++) {
+      //   a.push_back(1.0/(i+1));
+      //   b.push_back(a[i]);
+      // }
 
+      Kokkos::parallel_for(VECTOR_SIZE, KOKKOS_LAMBDA (const size_t i) {
+        a(i) = 1.0/(i+1);
+        b(i) = a(i);
+      });
 
-      for(i = 0; i < KERNEL_REPEATS; i++) {
+      Kokkos::parallel_for(KERNEL_REPEATS, KOKKOS_LAMBDA (const size_t i) {
         clock_t start = clock();
 
-        for(j = 0; j < VECTOR_SIZE; ++j) { //Vector Addition
-            c[j] = a[j] + b[j];
-        }
+        Kokkos::parallel_for(VECTOR_SIZE, KOKKOS_LAMBDA (const size_t j) { //Vector Addition
+            c(j) = a(j) + b(j);
+        });
 
         clock_t end = clock();
         double diffs = (end - start)/(double)CLOCKS_PER_SEC;
         test_times[i] = diffs;
-      }
-
-      double avg = accumulate(test_times.begin(), test_times.end(), 0.0) / test_times.size();
+      });
 
       return test_times;
     }
