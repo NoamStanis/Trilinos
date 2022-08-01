@@ -84,12 +84,12 @@ namespace MueLu {
       //   b.push_back(a[i]);
       // }
 
-      Kokkos::parallel_for(VECTOR_SIZE, KOKKOS_LAMBDA (const size_t i) {
+      for(int i = 0; i < VECTOR_SIZE; i++) {
         a(i) = 1.0/(i+1);
         b(i) = a(i);
-      });
+      }
 
-      Kokkos::parallel_for(KERNEL_REPEATS, KOKKOS_LAMBDA (const size_t i) {
+      for(int i = 0; i < KERNEL_REPEATS; i++) {
         clock_t start = clock();
 
         Kokkos::parallel_for(VECTOR_SIZE, KOKKOS_LAMBDA (const size_t j) { //Vector Addition
@@ -99,7 +99,7 @@ namespace MueLu {
         clock_t end = clock();
         double diffs = (end - start)/(double)CLOCKS_PER_SEC;
         test_times[i] = diffs;
-      });
+      }
 
       return test_times;
     }
